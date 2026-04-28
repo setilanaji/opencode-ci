@@ -64,7 +64,7 @@ jobs:
             > review-output.txt 2> review-stderr.log || true
 
       - name: Post review to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');

@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Bundles & archives (build artifacts)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Logs and runtime
+*.log
+review-output.txt
+review-stderr.log
+describe-output.txt
+describe-stderr.log
+pr-diff.txt
+changed-files.txt
+commits.txt
+
+# Local env
+.env
+.env.local
+*.pem
+*.key
+
+# Node (in case the example Dockerfile is exercised locally)
+node_modules/
+dist/

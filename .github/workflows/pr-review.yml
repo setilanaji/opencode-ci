@@ -1,0 +1,139 @@
+name: PR Review (OpenCode)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate diff and file list
+        id: diff
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "$BASE_REF" --depth=1 || true
+          git diff "origin/$BASE_REF...HEAD" | head -c 100000 > pr-diff.txt
+          git diff --name-only "origin/$BASE_REF...HEAD" > changed-files.txt
+
+      - name: Run OpenCode review
+        env:
+          OPENCODE_PROVIDER: ${{ vars.OPENCODE_PROVIDER }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+          # Override with vars.OPENCODE_REVIEWER_IMAGE to use a custom-built image.
+          REVIEWER_IMAGE: ${{ vars.OPENCODE_REVIEWER_IMAGE || 'ghcr.io/setilanaji/opencode-ci/reviewer:latest' }}
+        run: |
+          # Map provider name to the env var opencode expects
+          case "$OPENCODE_PROVIDER" in
+            anthropic) KEY_VAR="ANTHROPIC_API_KEY" ;;
+            openai)    KEY_VAR="OPENAI_API_KEY" ;;
+            google)    KEY_VAR="GOOGLE_GENERATIVE_AI_API_KEY" ;;
+            *) echo "Unknown provider: $OPENCODE_PROVIDER"; exit 1 ;;
+          esac
+
+          # Use repo-local .opencode/ if present, otherwise image defaults are used
+          MOUNT_ARGS=""
+          if [ -d ".opencode" ]; then
+            MOUNT_ARGS="-v $PWD/.opencode:/reviewer/.opencode:ro"
+          fi
+
+          IMAGE="$REVIEWER_IMAGE"
+
+          # Pre-pull so image-pull progress doesn't pollute the captured output
+          docker pull "$IMAGE" >/dev/null 2>&1 || true
+
+          docker run --rm \
+            -e "${KEY_VAR}=${OPENCODE_API_KEY}" \
+            -e "OPENCODE_MODEL=${OPENCODE_MODEL}" \
+            -v "$PWD/pr-diff.txt:/workspace/pr-diff.txt:ro" \
+            -v "$PWD/changed-files.txt:/workspace/changed-files.txt:ro" \
+            $MOUNT_ARGS \
+            "$IMAGE" \
+            > review-output.txt 2> review-stderr.log || true
+
+      - name: Post review to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('review-output.txt', 'utf8').trim();
+
+            let parsed = null;
+            // Strip markdown code fences (```json … ```), then grab the outermost JSON object.
+            const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+            const start = stripped.indexOf('{');
+            const end = stripped.lastIndexOf('}');
+            const candidate = start !== -1 && end > start ? stripped.slice(start, end + 1) : stripped;
+            try { parsed = JSON.parse(candidate); } catch (e) {}
+
+            if (!parsed) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: "### OpenCode Review (raw)\n\n```\n" + raw.slice(0, 60000) + "\n```",
+              });
+              return;
+            }
+
+            const verdictMap = {
+              approve: 'COMMENT',
+              request_changes: 'REQUEST_CHANGES',
+              comment: 'COMMENT',
+            };
+            const event = verdictMap[parsed.verdict] || 'COMMENT';
+
+            const sevIcon = {
+              critical: '🔴',
+              high: '🟠',
+              medium: '🟡',
+              low: '🔵',
+              info: '⚪',
+            };
+
+            const issues = parsed.issues || [];
+            let issuesMd = '_No issues found._';
+            if (issues.length) {
+              const counts = issues.reduce((acc, i) => {
+                const s = (i.severity || 'info').toLowerCase();
+                acc[s] = (acc[s] || 0) + 1;
+                return acc;
+              }, {});
+              const countLine = Object.entries(counts)
+                .map(([s, n]) => `${sevIcon[s] || '•'} ${s}: ${n}`)
+                .join(' · ');
+
+              issuesMd = `${countLine}\n\n` + issues.map((i, idx) => {
+                const sev = (i.severity || 'info').toLowerCase();
+                const icon = sevIcon[sev] || '•';
+                const file = i.file || '';
+                const line = i.line ? `:${i.line}` : '';
+                const cat = i.category ? ` _(${i.category})_` : '';
+                const msg = (i.message || '').trim();
+                const sug = (i.suggestion || '').trim();
+                const sugBlock = sug ? `\n\n  **Suggestion:** ${sug}` : '';
+                return `**${idx + 1}. ${icon} ${sev}** — \`${file}${line}\`${cat}\n\n  ${msg}${sugBlock}`;
+              }).join('\n\n---\n\n');
+            }
+
+            const body = `### OpenCode Review\n\n**Summary:** ${parsed.summary || '(none)'}\n\n**Verdict:** \`${parsed.verdict}\`\n\n${issuesMd}`;
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event,
+              body,
+            });

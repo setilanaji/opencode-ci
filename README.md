@@ -1,0 +1,73 @@
+# opencode-ci
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+A drop-in CI/CD framework that adds **AI-powered PR review**, **AI-generated PR descriptions**, and **Docker-based deployment** to any GitHub repository. Powered by [`opencode-ai`](https://www.npmjs.com/package/opencode-ai), so you can run reviews against Anthropic, OpenAI, or Google models with a single env var.
+
+## What you get
+
+- **PR review on every pull request** — stack-aware (Kotlin/Swift/Dart skill files), severity-graded, posts a structured GitHub review with line-level findings.
+- **PR description on open** — summary, change list, breaking-change detection, manual-test notes.
+- **Build → push → SSH-deploy pipeline** — multi-stage Docker build, registry push, health-checked rollout to an Azure VM or any Docker host.
+- **Customizable rules and skills** — drop new files in `.opencode/rules/` or `.opencode/skills/` and they get loaded automatically.
+
+## Quick start
+
+1. Copy `.opencode/`, `.github/workflows/`, and `docker/` into the root of your repo.
+2. Configure GitHub repository **Secrets** and **Variables** (see [SETUP.md](SETUP.md) for the full list).
+3. Open a PR — the AI review and description will post within ~1–2 minutes.
+
+Detailed setup, including VM provisioning and Dockerfile customization, lives in [SETUP.md](SETUP.md).
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────────┐     ┌──────────────────┐
+│  PR opened      │ ──► │ pr-review.yml        │ ──► │ GitHub PR review │
+│  /synchronized  │     │  + pr-describe.yml   │     │  + PR body       │
+└─────────────────┘     │  (run reviewer image │     └──────────────────┘
+                        │   with diff + rules) │
+                        └──────────────────────┘
+
+┌─────────────────┐     ┌──────────────────────┐     ┌──────────────────┐
+│  push to main   │ ──► │ deploy.yml           │ ──► │ Azure VM /       │
+│                 │     │  build → push → ssh  │     │ Docker host      │
+└─────────────────┘     └──────────────────────┘     └──────────────────┘
+```
+
+The reviewer is a Docker image (`docker/Dockerfile.reviewer`) that bundles `opencode-ai` plus the default rules and skills. PR workflows pull the image, mount the diff, and capture the JSON response.
+
+## Customization
+
+| What | Where |
+|------|-------|
+| Always-on review rules | `.opencode/rules/*.md` (referenced in `.opencode/config.json`) |
+| Stack-specific guidance | `.opencode/skills/*.md` (loaded conditionally by file extension in `docker/entrypoint.sh`) |
+| PR description prompt | `.opencode/skills/pr-description.md` |
+| App build | `docker/Dockerfile` (Node example — replace for your stack) |
+| Runtime | `docker/docker-compose.yml` |
+
+To add a new stack skill, drop a markdown file into `.opencode/skills/` and add a `grep`-based detection branch in `docker/entrypoint.sh`.
+
+## Supported AI providers
+
+Set `OPENCODE_PROVIDER` (variable) and `OPENCODE_API_KEY` (secret):
+
+| Provider   | Example model |
+|------------|---------------|
+| `anthropic`| `claude-sonnet-4-20250514` |
+| `openai`   | `gpt-4o` |
+| `google`   | `gemini-1.5-pro` |
+
+## Contributing
+
+We welcome new rules, skill files, and improvements to the workflows. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Found a vulnerability? Please follow the disclosure process in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Setilanaji

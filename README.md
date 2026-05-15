@@ -95,7 +95,7 @@ We welcome new rules, skill files, and improvements to the workflows. See [CONTR
 
 ## Security
 
-Found a vulnerability? Please follow the disclosure process in [SECURITY.md](SECURITY.md).
+Found a vulnerability? Please follow the disclosure process in [SECURITY.md](SECURITY.md). The reviewer image sanitizes the PR diff, changed-files list, and commit messages against known prompt-injection patterns before building the prompt; see the [Prompt injection threat model](SECURITY.md#prompt-injection-threat-model) section for what is and isn't protected.
 
 ## License
 

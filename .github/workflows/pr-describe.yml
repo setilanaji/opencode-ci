@@ -27,7 +27,29 @@ jobs:
           git log "origin/$BASE_REF...HEAD" --pretty=format:"%h %s%n%b" > commits.txt
           git diff --name-only "origin/$BASE_REF...HEAD" > changed-files.txt
 
+      - name: Filter noise from diff
+        id: filter
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          bash .github/scripts/filter-diff.sh changed-files.txt > changed-files-reviewable.txt
+          SURVIVORS=$(grep -c '' changed-files-reviewable.txt || true)
+          if [ "$SURVIVORS" -eq 0 ]; then
+            echo "skip_describe=true" >> "$GITHUB_OUTPUT"
+            echo "All changed files matched the filter; description will be skipped."
+          else
+            echo "skip_describe=false" >> "$GITHUB_OUTPUT"
+            SURVIVOR_ARR=()
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              SURVIVOR_ARR+=("$line")
+            done < changed-files-reviewable.txt
+            git diff -U10 "origin/$BASE_REF...HEAD" -- "${SURVIVOR_ARR[@]}" | head -c 100000 > pr-diff.txt
+            cp changed-files-reviewable.txt changed-files.txt
+          fi
+
       - name: Run OpenCode describe
+        if: steps.filter.outputs.skip_describe != 'true'
         env:
           OPENCODE_PROVIDER: ${{ vars.OPENCODE_PROVIDER }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -70,6 +92,7 @@ jobs:
           echo
 
       - name: Update PR body
+        if: steps.filter.outputs.skip_describe != 'true'
         uses: actions/github-script@v7
         with:
           script: |

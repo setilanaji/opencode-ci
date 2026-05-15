@@ -27,7 +27,47 @@ jobs:
           git diff "origin/$BASE_REF...HEAD" | head -c 100000 > pr-diff.txt
           git diff --name-only "origin/$BASE_REF...HEAD" > changed-files.txt
 
+      - name: Filter noise from diff
+        id: filter
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          bash .github/scripts/filter-diff.sh changed-files.txt > changed-files-reviewable.txt
+          SURVIVORS=$(grep -c '' changed-files-reviewable.txt || true)
+          ORIGINAL=$(grep -c '' changed-files.txt || true)
+          FILTERED=$((ORIGINAL - SURVIVORS))
+          echo "survivor_count=$SURVIVORS" >> "$GITHUB_OUTPUT"
+          echo "filtered_count=$FILTERED" >> "$GITHUB_OUTPUT"
+          if [ "$SURVIVORS" -eq 0 ]; then
+            echo "skip_review=true" >> "$GITHUB_OUTPUT"
+            echo "All $ORIGINAL changed file(s) matched the filter; review will be skipped."
+          else
+            echo "skip_review=false" >> "$GITHUB_OUTPUT"
+            SURVIVOR_ARR=()
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              SURVIVOR_ARR+=("$line")
+            done < changed-files-reviewable.txt
+            git diff "origin/$BASE_REF...HEAD" -- "${SURVIVOR_ARR[@]}" | head -c 100000 > pr-diff.txt
+            cp changed-files-reviewable.txt changed-files.txt
+            echo "$SURVIVORS file(s) reviewable, $FILTERED filtered."
+          fi
+
+      - name: Post skip comment
+        if: steps.filter.outputs.skip_review == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const filtered = '${{ steps.filter.outputs.filtered_count }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `OpenCode Review — skipped (no reviewable files after filtering: ${filtered} filtered as lockfiles / generated / minified).`,
+            });
+
       - name: Run OpenCode review
+        if: steps.filter.outputs.skip_review != 'true'
         env:
           OPENCODE_PROVIDER: ${{ vars.OPENCODE_PROVIDER }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -64,6 +104,7 @@ jobs:
             > review-output.txt 2> review-stderr.log || true
 
       - name: Post review to PR
+        if: steps.filter.outputs.skip_review != 'true'
         uses: actions/github-script@v7
         with:
           script: |

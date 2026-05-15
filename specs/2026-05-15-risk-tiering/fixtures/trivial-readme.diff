@@ -1,0 +1,11 @@
+diff --git a/README.md b/README.md
+index aaaaaaa..bbbbbbb 100644
+--- a/README.md
++++ b/README.md
+@@ -10,7 +10,7 @@
+ ## What it does
+
+-Reviwes PRs and deploys to a VM.
++Reviews PRs and deploys to a VM.
+
+ ## Setup

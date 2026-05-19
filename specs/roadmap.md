@@ -53,7 +53,7 @@ under `src/auth/` triggers full review; the standard path is unchanged.
 Spec lives in `specs/2026-05-15-risk-tiering/`.
 
 ### Phase 1.3 — Prompt-injection hardening
-**Status:** spec drafted, not started.
+**Status:** implementation complete on branch `phase-1.3-prompt-injection-hardening` (HEAD `b5c71f5`). Validation §§ 1–2 verified locally on 2026-05-19 (shellcheck clean, image build OK, all 6 fixtures match expected sentinel matrix). Awaiting: PR + merge to `main`, reviewer-image rebuild via `build-reviewer.yml`, post-merge §§ 3–4 validation on a fork.
 **Why:** The diff is concatenated raw into the prompt. A third-party PR can
 embed XML/markdown that breaks out of the diff section and rewrites
 instructions. This is a real attack surface once the framework is used on

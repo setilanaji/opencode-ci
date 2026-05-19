@@ -46,7 +46,12 @@ require restructuring the prompt.
 ### In
 - A sanitization pass in `docker/entrypoint.sh` applied to:
   - The diff content before it's injected after `===== PR DIFF =====`.
-  - The PR title, body, and commit messages in describe mode.
+  - The changed-files list and commit messages in describe mode.
+  - PR title and body are **not** sanitized because the workflow does not
+    pass them to the reviewer container — `.github/workflows/pr-describe.yml`
+    only mounts the diff, changed-files, commits, and a read-only repo
+    checkout. If a future change starts piping title/body through, extend
+    `sanitize_untrusted` to cover them.
 - The sanitizer strips:
   - Any line matching `^=====[[:space:]].*[[:space:]]=====$` (forged
     boundary markers).

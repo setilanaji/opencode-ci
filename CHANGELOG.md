@@ -23,6 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logic in `.github/scripts/compute-tier.sh`. (Phase 1.2; see
   `specs/2026-05-15-risk-tiering/`.)
 
+### Security
+- Prompt-injection hardening in the reviewer image: `docker/entrypoint.sh`
+  now sanitizes the diff, changed-files list, and commit messages before
+  they reach the prompt. Lines containing forged section delimiters
+  (`===== ... =====`), instruction tags (`<system>`, `<|im_start|>`,
+  `[INST]`, etc.), or known jailbreak prose are replaced with a
+  `[redacted: matched injection-filter pattern]` sentinel. Threat model
+  documented in `SECURITY.md`. **Requires a reviewer image rebuild**
+  (triggered automatically by `build-reviewer.yml` on merge to main).
+  (Phase 1.3; see `specs/2026-05-15-prompt-injection-hardening/`.)
+
 ## [0.1.0] - 2026-04-28
 
 ### Added

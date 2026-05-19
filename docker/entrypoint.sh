@@ -19,6 +19,47 @@ if [ ! -f "$DIFF_FILE" ]; then
   exit 1
 fi
 
+# Strip known prompt-injection patterns from attacker-controlled content
+# (diff, changed-files, commit messages) before it lands in the prompt.
+# Threat model: SECURITY.md § "Prompt injection threat model".
+sanitize_untrusted() {
+  awk '
+    BEGIN { S = "[redacted: matched injection-filter pattern]" }
+    {
+      line = $0
+      if (line ~ /=====[[:space:]].*[[:space:]]=====/) { print S; next }
+      if (index(line, "<system>") || index(line, "</system>")) { print S; next }
+      if (index(line, "<|im_start|>") || index(line, "<|im_end|>")) { print S; next }
+      if (index(line, "<|start|>") || index(line, "<|end|>")) { print S; next }
+      if (index(line, "[INST]") || index(line, "[/INST]")) { print S; next }
+      if (index(line, "### NEW INSTRUCTIONS")) { print S; next }
+      if (index(line, "### INSTRUCTION OVERRIDE")) { print S; next }
+      if (index(line, "### END USER INSTRUCTIONS")) { print S; next }
+      lower = tolower(line)
+      if (lower ~ /ignore (all )?previous instructions/) { print S; next }
+      if (lower ~ /disregard (the )?above/) { print S; next }
+      if (lower ~ /you are now/) { print S; next }
+      if (lower ~ /act as if/) { print S; next }
+      print line
+    }
+  '
+}
+
+sanitize_untrusted < "$DIFF_FILE" > /tmp/diff-sanitized.txt
+DIFF_FILE_SAFE=/tmp/diff-sanitized.txt
+
+FILES_FILE_SAFE=""
+if [ -f "$FILES_FILE" ]; then
+  sanitize_untrusted < "$FILES_FILE" > /tmp/files-sanitized.txt
+  FILES_FILE_SAFE=/tmp/files-sanitized.txt
+fi
+
+COMMITS_FILE_SAFE=""
+if [ -f "$COMMITS_FILE" ]; then
+  sanitize_untrusted < "$COMMITS_FILE" > /tmp/commits-sanitized.txt
+  COMMITS_FILE_SAFE=/tmp/commits-sanitized.txt
+fi
+
 if [ "$MODE" = "describe" ]; then
   # Build PR description prompt
   {
@@ -37,20 +78,20 @@ if [ "$MODE" = "describe" ]; then
       echo
     fi
 
-    if [ -f "$FILES_FILE" ]; then
+    if [ -n "$FILES_FILE_SAFE" ]; then
       echo "===== CHANGED FILES ====="
-      cat "$FILES_FILE"
+      cat "$FILES_FILE_SAFE"
       echo
     fi
 
-    if [ -f "$COMMITS_FILE" ]; then
+    if [ -n "$COMMITS_FILE_SAFE" ]; then
       echo "===== COMMIT MESSAGES ====="
-      cat "$COMMITS_FILE"
+      cat "$COMMITS_FILE_SAFE"
       echo
     fi
 
     echo "===== PR DIFF ====="
-    cat "$DIFF_FILE"
+    cat "$DIFF_FILE_SAFE"
     echo
 
     echo "Respond with ONLY the JSON object specified by the pr-description skill. No prose, no fences."
@@ -74,16 +115,16 @@ else
     echo
 
     # Stack-aware skill injection (only if changed-files.txt is provided)
-    if [ -f "$FILES_FILE" ]; then
-      if grep -qE '\.(kt|kts|gradle)$' "$FILES_FILE"; then
+    if [ -n "$FILES_FILE_SAFE" ]; then
+      if grep -qE '\.(kt|kts|gradle)$' "$FILES_FILE_SAFE"; then
         echo "===== SKILL: android-kotlin ====="
         cat "$RULES_DIR/skills/android-kotlin.md"; echo
       fi
-      if grep -qE '\.swift$' "$FILES_FILE"; then
+      if grep -qE '\.swift$' "$FILES_FILE_SAFE"; then
         echo "===== SKILL: ios-macos-swift ====="
         cat "$RULES_DIR/skills/ios-swift.md"; echo
       fi
-      if grep -qE '\.dart$' "$FILES_FILE"; then
+      if grep -qE '\.dart$' "$FILES_FILE_SAFE"; then
         echo "===== SKILL: flutter ====="
         cat "$RULES_DIR/skills/flutter.md"; echo
       fi
@@ -94,7 +135,7 @@ else
     echo
 
     echo "===== PR DIFF ====="
-    cat "$DIFF_FILE"
+    cat "$DIFF_FILE_SAFE"
     echo
 
     echo "Respond with ONLY the JSON object specified by the code-review rules. No prose, no fences."

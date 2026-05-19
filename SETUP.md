@@ -4,14 +4,17 @@ These steps integrate `opencode-ci` into a target repository.
 
 ## 1. Copy files into your repo
 
-Drop the contents of this repo at the root of your project so you end up with `.opencode/`, `.github/workflows/`, and `docker/` at the root.
+Drop the runtime files at the root of your project so you end up with `.opencode/`, `.github/` (workflows + scripts), and `docker/` at the root.
 
-You can do that via:
+The consumer-facing workflows and helper scripts live under `templates/.github/` in this repo so they don't run against `opencode-ci` itself. Copy that subtree into your repo's `.github/`:
 
 ```sh
 git clone --depth=1 https://github.com/setilanaji/opencode-ci.git /tmp/opencode-ci
-cp -R /tmp/opencode-ci/.opencode /tmp/opencode-ci/.github /tmp/opencode-ci/docker .
+cp -R /tmp/opencode-ci/.opencode /tmp/opencode-ci/docker .
+cp -R /tmp/opencode-ci/templates/.github .
 ```
+
+After the copy you should have `.github/workflows/{pr-review,pr-describe,deploy}.yml` and `.github/scripts/{filter-diff,compute-tier}.sh` in your project.
 
 ## 2. GitHub Repository Secrets
 

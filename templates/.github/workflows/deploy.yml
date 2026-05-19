@@ -18,6 +18,10 @@ permissions:
 
 jobs:
   build:
+    # Skip cleanly when the consumer hasn't configured a deploy target yet —
+    # avoids red ❌ checks on merges in freshly-installed repos that haven't
+    # set up the deploy VM or registry credentials.
+    if: vars.DEPLOY_TARGET != ''
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}

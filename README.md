@@ -14,9 +14,11 @@ A drop-in CI/CD framework that adds **AI-powered PR review**, **AI-generated PR 
 
 ## Quick start
 
-1. Copy `.opencode/`, `.github/workflows/`, and `docker/` into the root of your repo.
+1. Copy `.opencode/` and `docker/` into the root of your repo, plus the `templates/.github/` subtree as your `.github/` (`cp -R templates/.github .`).
 2. Configure GitHub repository **Secrets** and **Variables** (see [SETUP.md](SETUP.md) for the full list).
 3. Open a PR — the AI review and description will post within ~1–2 minutes.
+
+> The runtime workflows (`pr-review.yml`, `pr-describe.yml`, `deploy.yml`) live under `templates/.github/` in this repo so they don't run against `opencode-ci` itself. The only workflow at this repo's `.github/workflows/` is `build-reviewer.yml`, which publishes the reviewer image consumers pull. Until you set `OPENCODE_PROVIDER` (and `DEPLOY_TARGET` for the deploy pipeline), the copied workflows skip cleanly rather than fail.
 
 Detailed setup, including VM provisioning and Dockerfile customization, lives in [SETUP.md](SETUP.md).
 
@@ -40,8 +42,10 @@ The reviewer is a Docker image (`docker/Dockerfile.reviewer`) that bundles `open
 
 ## Customization
 
-| What | Where |
-|------|-------|
+Paths below are how files appear in **your** repo after the copy. In this source repo they live under `templates/.github/` (workflows + scripts) — `.opencode/` and `docker/` are at the root in both places.
+
+| What | Where (in your repo) |
+|------|----------------------|
 | Always-on review rules | `.opencode/rules/*.md` (referenced in `.opencode/config.json`) |
 | Stack-specific guidance | `.opencode/skills/*.md` (loaded conditionally by file extension in `docker/entrypoint.sh`) |
 | PR description prompt | `.opencode/skills/pr-description.md` |

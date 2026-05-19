@@ -65,6 +65,20 @@ Database migration paths (`*/migrations/*`, `*/migrate/*`, `db/migrate/*`) are e
 
 If a PR contains only filtered files, the review workflow posts a one-line "skipped" comment and does not call the AI. To extend or override the filter list, fork `.github/scripts/filter-diff.sh`.
 
+### Risk tiering
+
+After filtering, the PR is assigned a tier and routed accordingly:
+
+| Tier | When | Behavior |
+|---|---|---|
+| **trivial** | ≤10 LOC AND ≤2 files AND no sensitive path | Skip AI review; post a one-line "skipped (trivial)" comment |
+| **full** | Any change touching a sensitive path | Always reviewed, regardless of size |
+| **standard** | Everything else | Reviewed as today |
+
+**Sensitive paths** (force tier = `full` even on a tiny diff): `**/auth/**`, `**/authentication/**`, `**/security/**`, `**/crypto/**`, `**/secrets/**`, `**/oauth/**`, `**/saml/**`, `**/.env*`, `**/credentials*`, `**/iam/**`, `**/Dockerfile`, `**/docker-compose*.yml`, `**/.github/workflows/**`, `**/terraform/**`, `**/k8s/**`, `**/migrations/**`, `**/migrate/**`, `db/migrate/**`.
+
+Tier logic lives in `.github/scripts/compute-tier.sh`. Fork it to change thresholds or the sensitive list.
+
 ## Supported AI providers
 
 Set `OPENCODE_PROVIDER` (variable) and `OPENCODE_API_KEY` (secret):

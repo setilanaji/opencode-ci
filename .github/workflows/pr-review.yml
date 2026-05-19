@@ -66,8 +66,28 @@ jobs:
               body: `OpenCode Review — skipped (no reviewable files after filtering: ${filtered} filtered as lockfiles / generated / minified).`,
             });
 
-      - name: Run OpenCode review
+      - name: Compute review tier
+        id: tier
         if: steps.filter.outputs.skip_review != 'true'
+        run: |
+          bash .github/scripts/compute-tier.sh changed-files-reviewable.txt pr-diff.txt | tee -a "$GITHUB_OUTPUT"
+
+      - name: Post trivial-skip comment
+        if: steps.filter.outputs.skip_review != 'true' && steps.tier.outputs.tier == 'trivial'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const loc = '${{ steps.tier.outputs.loc_changed }}';
+            const files = '${{ steps.tier.outputs.files_changed }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `OpenCode Review — skipped (trivial: ${files} file(s), ${loc} LOC). PRs with ≤10 LOC across ≤2 files skip AI review by default unless they touch a sensitive path (auth, crypto, migrations, workflows, etc.).`,
+            });
+
+      - name: Run OpenCode review
+        if: steps.filter.outputs.skip_review != 'true' && steps.tier.outputs.tier != 'trivial'
         env:
           OPENCODE_PROVIDER: ${{ vars.OPENCODE_PROVIDER }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -104,7 +124,7 @@ jobs:
             > review-output.txt 2> review-stderr.log || true
 
       - name: Post review to PR
-        if: steps.filter.outputs.skip_review != 'true'
+        if: steps.filter.outputs.skip_review != 'true' && steps.tier.outputs.tier != 'trivial'
         uses: actions/github-script@v7
         with:
           script: |

@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one-line "skipped" comment instead of a full review. Provider-agnostic;
   works on any of `anthropic`, `openai`, `google`. (Phase 1.1; see
   `specs/2026-05-15-diff-filtering/`.)
+- Risk tiering of PRs before review: trivial PRs (≤10 LOC across ≤2 files,
+  no sensitive path) skip the AI call and post a "skipped (trivial)"
+  comment; PRs touching sensitive paths (auth, crypto, secrets, env,
+  Dockerfiles, workflows, terraform, k8s, migrations) are forced to full
+  review regardless of size; standard PRs are reviewed unchanged. Tier
+  logic in `.github/scripts/compute-tier.sh`. (Phase 1.2; see
+  `specs/2026-05-15-risk-tiering/`.)
 
 ## [0.1.0] - 2026-04-28
 

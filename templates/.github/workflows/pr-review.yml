@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   review:
+    # Skip cleanly when the consumer hasn't configured OpenCode yet — avoids
+    # red ❌ checks on PRs in freshly-installed repos.
+    if: vars.OPENCODE_PROVIDER != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

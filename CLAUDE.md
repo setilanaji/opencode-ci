@@ -4,9 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-A drop-in CI/CD framework that adds AI-powered PR review and Docker-based deployment to any repository. Users copy `.opencode/`, `.github/workflows/`, and `docker/` into their own repo and configure GitHub secrets/variables.
+A drop-in CI/CD framework that adds AI-powered PR review and Docker-based deployment to any repository. Users copy `.opencode/`, `docker/`, and the `templates/.github/` subtree into their own repo and configure GitHub secrets/variables.
 
 There is no application to build or test here — this repo is a template/distribution package.
+
+## Layout
+
+- `.github/workflows/build-reviewer.yml` — **this repo's own workflow.** Publishes the reviewer image to GHCR. Do not move.
+- `templates/.github/workflows/{pr-review,pr-describe,deploy}.yml` — **consumer-facing templates.** They live under `templates/` so GitHub Actions doesn't run them against `opencode-ci` itself. Consumers copy `templates/.github/` → `.github/` in their own repo.
+- `templates/.github/scripts/{filter-diff,compute-tier}.sh` — helper scripts the template workflows call. Same copy story.
+- All three template workflows are guarded with `if: vars.OPENCODE_PROVIDER != ''` (or `DEPLOY_TARGET` for deploy) so consumers who copy but haven't configured see ✅-skipped instead of ❌-failed.
 
 ## Integration into a Target Repo
 
@@ -23,7 +30,7 @@ There is no application to build or test here — this repo is a template/distri
 
 ## Architecture
 
-### PR Review Pipeline (`.github/workflows/pr-review.yml`)
+### PR Review Pipeline (`templates/.github/workflows/pr-review.yml`)
 
 1. Triggered on PR open/synchronize
 2. Detects changed files and selects stack-aware skill files (`.kt`/`.gradle` → `android-kotlin.md`, `.swift` → `ios-swift.md`, `.dart` → `flutter.md`; `general.md` always included)
@@ -31,7 +38,7 @@ There is no application to build or test here — this repo is a template/distri
 4. Runs `opencode -p "$PROMPT" --no-input` via `npm install -g opencode-ai`
 5. Parses JSON response and posts as a GitHub PR review (verdict + issue table)
 
-### Deploy Pipeline (`.github/workflows/deploy.yml`)
+### Deploy Pipeline (`templates/.github/workflows/deploy.yml`)
 
 1. Triggered on push to `main`/`master`
 2. Multi-stage Docker build (`docker/Dockerfile`) → push tagged image to registry

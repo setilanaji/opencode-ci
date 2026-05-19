@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Diff filtering before review/describe: lockfiles, minified bundles, source
+  maps, and `@generated`-marked files are stripped from the prompt by
+  `.github/scripts/filter-diff.sh`. Database migrations are exempt from
+  the `@generated`-marker rule. PRs with only filtered files post a
+  one-line "skipped" comment instead of a full review. Provider-agnostic;
+  works on any of `anthropic`, `openai`, `google`. (Phase 1.1; see
+  `specs/2026-05-15-diff-filtering/`.)
+
 ## [0.1.0] - 2026-04-28
 
 ### Added

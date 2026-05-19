@@ -1,0 +1,17 @@
+diff --git a/package-lock.json b/package-lock.json
+index 1111111..2222222 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -100,6 +100,12 @@
++    "node_modules/example-pkg": {
++      "version": "1.2.3"
++    },
+diff --git a/yarn.lock b/yarn.lock
+index 3333333..4444444 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -50,3 +50,9 @@
++example-pkg@^1.2.3:
++  version "1.2.3"
++  resolved "https://registry.yarnpkg.com/example-pkg/-/example-pkg-1.2.3.tgz"
++  integrity sha512-....
